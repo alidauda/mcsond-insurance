@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Brand ──────────────────────────────── */
+  --color-navy: #2e2e6b;
+  --color-navy-800: #26265a;
+  --color-navy-700: #313173;
+  --color-navy-300: #6f6fa6;
+  --color-navy-100: #e3e3ef;
+  --color-crimson: #c8233c;
+  --color-crimson-700: #ab1d33;
+  --color-crimson-100: #f7dde1;
+
+  /* ── Surfaces ───────────────────────────── */
+  --color-canvas: #f7f5f0;
+  --color-surface: #ffffff;
+  --color-surface-soft: #faf9f5;
+  --color-sidebar: #f3efe8;
+  --color-admin: #1a1917;
+  --color-admin-800: #232220;
+  --color-admin-700: #2e2c29;
+  --color-admin-muted: #8a877f;
+
+  /* ── Ink ────────────────────────────────── */
+  --color-ink: #26262e;
+  --color-ink-soft: #4b4b54;
+  --color-muted: #73726c;
+  --color-faint: #9b988f;
+
+  /* ── Lines ──────────────────────────────── */
+  --color-line: #e7e3d9;
+  --color-line-soft: #efece4;
+
+  /* ── Status ─────────────────────────────── */
+  --color-success: #2f7d54;
+  --color-success-bg: #e9f3ec;
+  --color-warning: #a6791f;
+  --color-warning-bg: #f6efda;
+  --color-danger: #c8233c;
+  --color-danger-bg: #fbeaec;
+
+  /* ── Type ───────────────────────────────── */
+  --font-serif: var(--font-source-serif), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
+
+  /* ── Radius ─────────────────────────────── */
+  --radius-card: 14px;
+  --radius-lg: 18px;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-padding-top: 5rem;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-crimson) 22%, transparent);
+}
+
+/* numerals line up in tables / money */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* monospace eyebrow / label */
+.eyebrow {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--color-faint);
+}
+
+/* serif display headline helper */
+.display {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.04;
+  color: var(--color-navy);
+}
+
+/* slim, branded scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}

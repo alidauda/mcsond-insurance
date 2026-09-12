@@ -1,0 +1,316 @@
+{
+  "info": {
+    "_postman_id": "372bba07-9983-46c1-bfa7-18d20a1d686c",
+    "name": "InsuranceBrokerApi",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "5869879"
+  },
+  "item": [
+    {
+      "name": "Buy Comprehensive",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"username\":\"apptester4601@gmail.com\",\n    \"password\":\"123456\",\n    \"apiKey\":\"9AYW6vir0FivRpcMx9Iw\",\n    \"email\":\"customer@email.com\",\n    \"title\" : \"Mr\",\n    \"fname\" : \"John\",\n    \"lname\" : \"Doe\",\n    \"dob\" : \"12/02/1988\",\n    \"sex\" : \"male\", \n    \"phone_no\":\"090892233487\", \n    \"address\" : \"Main address, Test Street\", \n    \"occupation\" : \"Broker\", \n    \"id_type\":\"International Passport\", \n    \"id_no\" : \"A00894222\",\n    \"state\" : \"Lagos\",\n    \"tin\" : \"19000-100\",\n    \"comp_name\" : \"\",\n    \"startDate\" : \"2026-05-25\",\n    \"model\" : \"00042\",\n    \"brand\" : \"00036\",\n    \"color\" : \"Black\",\n    \"reg_no\" : \"ABC101YX\",\n    \"eng_no\" : \"HB33890C06POVPKSA0101YZ\",\n    \"chasis_no\" : \"433J4543GPO84KSA0101YZ\",\n    \"year\" : \"2020\",\n    \"type\" : 1,\n    \"veh_usage\" : \"Private\", \n    \"costOfVeh\": 12000000,\n    \"exBuyBack\": 1,\n    \"ins_address\": \"Address for Inspection\",\n    \"ins_contact\": \"08012345678\",\n    \"ins_date\": \"26/05/2026\",\n    \"ins_person\": \"Jane Doe\",\n    \"ins_state\": \"0023\",\n    \"credit_note_no\" : \"0021PLJM\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/buyComp",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "buyComp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "vehicleMakes",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": ""
+        },
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/VehicleMakes",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "VehicleMakes"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "States",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/States",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "States"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "FetchVehModels",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/VehicleModels/00036",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "VehicleModels",
+            "00036"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "FetchModel",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/GetModel/00036/00042",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "GetModel",
+            "00036",
+            "00042"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "FetchVehmakes",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/VehicleModels/00036",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "VehicleModels",
+            "00036"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Buy Motor Third Party",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"username\":\"apptester4601@gmail.com\",\n    \"password\":\"123456\",\n    \"apiKey\":\"9AYW6vir0FivRpcMx9Iw\",\n    \"email\":\"customer@email.com\",\n    \"title\" : \"Mr\",\n    \"fname\" : \"John\",\n    \"lname\" : \"Doe\",\n    \"dob\" : \"12/02/1988\",\n    \"sex\" : \"male\", \n    \"phone_no\":\"090892233487\", \n    \"address\" : \"Main address, Test Street\", \n    \"occupation\" : \"Broker\", \n    \"id_type\":\"International Passport\", \n    \"id_no\" : \"A00894222\",\n    \"state\" : \"Lagos\",\n    \"tin\" : \"19000-100\",\n    \"comp_name\" : \"\",\n    \"startDate\" : \"2026-05-10\",\n    \"model\" : \"00042\",\n    \"brand\" : \"00036\",\n    \"color\" : \"Black\",\n    \"reg_no\" : \"AAA325KJ\",\n    \"eng_no\" : \"HB33890C06POVPKSA099032\",\n    \"chasis_no\" : \"433J4543GPO84KSA099032\",\n    \"year\" : \"2020\",\n    \"type\" : \"Car\",\n    \"veh_usage\" : \"Private\", \n    \"credit_note_no\" : \"0018PLJM\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/buyMtp",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "buyMtp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "VehicleTypes",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/vehicleTypes",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "vehicleTypes"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "EmtpVariants",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/EnhancedTypes",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "EnhancedTypes"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Buy Enhanced MTP",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"username\":\"apptester4601@gmail.com\",\n    \"password\":\"123456\",\n    \"apiKey\":\"9AYW6vir0FivRpcMx9Iw\",\n    \"email\":\"customer@email.com\",\n    \"title\" : \"Mr\",\n    \"fname\" : \"John\",\n    \"lname\" : \"Doe\",\n    \"dob\" : \"12/02/1988\",\n    \"sex\" : \"male\", \n    \"phone_no\":\"090892233487\", \n    \"address\" : \"Main address, Test Street\", \n    \"occupation\" : \"Broker\", \n    \"id_type\":\"International Passport\", \n    \"id_no\" : \"A00894222\",\n    \"state\" : \"Lagos\",\n    \"tin\" : \"19000-100\",\n    \"comp_name\" : \"\",\n    \"startDate\" : \"2026-05-25\",\n    \"model\" : \"00042\",\n    \"brand\" : \"00036\",\n    \"color\" : \"Black\",\n    \"reg_no\" : \"ABC100YX\",\n    \"eng_no\" : \"HB33890C06POVPKSA0100YZ\",\n    \"chasis_no\" : \"433J4543GPO84KSA0100YZ\",\n    \"year\" : \"2020\",\n    \"type\" : \"Car\",\n    \"veh_usage\" : \"Private\", \n    \"policyType\": \"Type B\",\n    \"amount\": \"35000\",\n    \"ins_address\": \"Address for Inspection\",\n    \"ins_contact\": \"08012345678\",\n    \"ins_date\": \"26/05/2026\",\n    \"ins_person\": \"Jane Doe\",\n    \"ins_state\": \"0023\",\n    \"credit_note_no\" : \"0019PLJM\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/buyEmtp",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "buyEmtp"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Comprehensive Premium",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/ComprehensivePremium/15000000/2/0",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "ComprehensivePremium",
+            "15000000",
+            "2",
+            "0"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "EmtpPremium",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://sandbox.einsurance.nem-insurance.com/EnhancedPremium/Type B",
+          "protocol": "https",
+          "host": [
+            "sandbox",
+            "einsurance",
+            "nem-insurance",
+            "com"
+          ],
+          "path": [
+            "EnhancedPremium",
+            "Type B"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

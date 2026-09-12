@@ -1,0 +1,1 @@
+ALTER TABLE "kyc_profile" ADD COLUMN "photoData" text;
