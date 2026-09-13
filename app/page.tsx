@@ -34,8 +34,8 @@ export default async function SignInPage() {
         <div className="relative max-w-xl">
           <Eyebrow className="text-surface/55">{signIn.eyebrow}</Eyebrow>
           <h1 className="mt-6 font-serif text-6xl font-semibold leading-[1.02] tracking-tight">
-            One portal for the things that{" "}
-            <em className="italic text-crimson">build a business.</em>
+            Every policy your business depends on,{" "}
+            <em className="italic text-crimson">in one place.</em>
           </h1>
           <p className="mt-7 max-w-md text-lg leading-relaxed text-surface/75">{signIn.blurb}</p>
         </div>
@@ -68,7 +68,7 @@ export default async function SignInPage() {
               Welcome <em className="italic text-crimson">back.</em>
             </h2>
             <p className="mt-3 text-base text-muted">
-              Sign in with your email, or one click with Google.
+              Sign in to compare quotes, bind cover and download your certificates.
             </p>
 
             <div className="mt-9">

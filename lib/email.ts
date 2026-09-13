@@ -9,7 +9,7 @@ import { Resend } from "resend";
  * test address, which only delivers to your own account — set EMAIL_FROM to a
  * verified-domain sender for real invites.
  */
-const FROM = process.env.EMAIL_FROM ?? "McSond <onboarding@resend.dev>";
+const FROM = process.env.EMAIL_FROM ?? "McSond Insurance <onboarding@resend.dev>";
 
 /**
  * Email is optional. Without RESEND_API_KEY nothing is sent and the flows that
@@ -61,7 +61,7 @@ export async function sendStaffInvite(opts: {
     {
       from: FROM,
       to: [opts.to],
-      subject: "You've been invited to the McSond staff console",
+      subject: "You've been invited to the McSond Insurance staff console",
       html: inviteHtml({ roleLabel, signInUrl: opts.signInUrl, invitedByEmail: opts.invitedByEmail }),
       replyTo: opts.invitedByEmail,
       tags: [{ name: "category", value: "staff_invite" }],
@@ -130,7 +130,7 @@ function authHtml({
       <tr><td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e4dc;border-radius:14px;overflow:hidden;">
           <tr><td style="background:#11213a;padding:24px 28px;">
-            <span style="color:#ffffff;font-size:20px;font-weight:600;letter-spacing:-0.01em;">McSond</span>
+            <span style="color:#ffffff;font-size:20px;font-weight:600;letter-spacing:-0.01em;">McSond <span style="font-weight:400;">Insurance</span></span>
           </td></tr>
           <tr><td style="padding:28px;">
             <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#11213a;">${escapeHtml(heading)}</h1>
@@ -166,13 +166,13 @@ function inviteHtml({
       <tr><td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e4dc;border-radius:14px;overflow:hidden;">
           <tr><td style="background:#11213a;padding:24px 28px;">
-            <span style="color:#ffffff;font-size:20px;font-weight:600;letter-spacing:-0.01em;">McSond</span>
+            <span style="color:#ffffff;font-size:20px;font-weight:600;letter-spacing:-0.01em;">McSond <span style="font-weight:400;">Insurance</span></span>
             <span style="color:#c8102e;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.14em;display:block;margin-top:4px;">Staff console</span>
           </td></tr>
           <tr><td style="padding:28px;">
             <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#11213a;">You've been invited</h1>
             <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#54514a;">
-              You've been invited${inviter} to join the McSond staff console as
+              You've been invited${inviter} to join the McSond Insurance staff console as
               <strong style="color:#1a1917;">${escapeHtml(roleLabel)}</strong>.
             </p>
             <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#54514a;">
@@ -180,7 +180,7 @@ function inviteHtml({
               Your role is applied automatically on first sign-in.
             </p>
             <a href="${escapeHtml(signInUrl)}" style="display:inline-block;background:#11213a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:500;padding:12px 22px;border-radius:10px;">
-              Sign in to McSond
+              Sign in to McSond Insurance
             </a>
             <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#8a877f;">
               If you weren't expecting this invitation, you can safely ignore this email.

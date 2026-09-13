@@ -24,7 +24,8 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "McSond Insurance · Promise kept",
   description:
-    "Buy cover from licensed underwriters, with a wallet you can audit.",
+    "Compare quotes from licensed underwriters, bind cover from a wallet you can audit, and get your certificate the same day.",
+  applicationName: "McSond Insurance",
 };
 
 export default function RootLayout({

@@ -59,8 +59,8 @@ export function CustomerShell({
   const sidebar = (
     <div className="flex h-full flex-col bg-sidebar">
       <div className="px-6 pt-6 pb-5">
-        <Logo tone="dark" markClass="size-10" wordClass="text-2xl" />
-        <p className="eyebrow mt-3 ml-[3.25rem] -translate-y-3">Customer portal</p>
+        <Logo tone="dark" product={false} markClass="size-10" wordClass="text-2xl" />
+        <p className="eyebrow mt-3 ml-[3.25rem] -translate-y-3">Insurance · Customer portal</p>
       </div>
       <div className="mx-6 border-t border-line" />
 

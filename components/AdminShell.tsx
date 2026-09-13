@@ -76,9 +76,9 @@ export function AdminShell({
         <Link href="/admin" className="flex items-center gap-3">
           <LogoMark className="size-10" />
           <span className="flex flex-col leading-none">
-            <Wordmark tone="light" className="text-2xl" />
+            <Wordmark tone="light" product={false} className="text-2xl" />
             <span className="mt-1.5 font-mono text-[0.6rem] uppercase tracking-[0.18em] text-admin-muted">
-              Staff console
+              Insurance · Staff console
             </span>
           </span>
         </Link>
