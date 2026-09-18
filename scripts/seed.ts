@@ -3,7 +3,7 @@
  *
  * Seeded users are *managed* rows (they appear in the console and can be
  * banned / role-changed / KYC-reviewed) but can only sign in if a real Google
- * account matches their email, or after `npm run dev:password` sets one.
+ * account matches their email (Google is the only sign-in method).
  *
  * Run: `npm run db:seed` (requires DATABASE_URL + a pushed schema).
  */

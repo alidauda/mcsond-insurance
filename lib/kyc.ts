@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "./db";
 import { kycProfile, kycVerification, auditEntry } from "./schema";
 import { user } from "./auth-schema";
+import { sendKycOutcomeEmail } from "./email";
 import {
   verifyByNin,
   verifyByPhone,
@@ -296,6 +297,10 @@ export async function runKycVerification(params: {
     response: redactedResponse,
     actorId,
   });
+
+  // Tell the customer the verdict. Fire-and-forget: mail must never hold up
+  // or fail the check (a provider error above is not a verdict, so no mail).
+  void sendKycOutcomeEmail({ to: account.email, name: account.name, outcome });
 
   return {
     outcome,

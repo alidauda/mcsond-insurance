@@ -6,7 +6,6 @@ import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { schema, staffInvite } from "./auth-schema";
 import { ac, roles, STAFF_ROLES, type Role } from "./permissions";
-import { sendAuthEmail, isEmailConfigured } from "./email";
 
 const STAFF_DOMAIN = (process.env.STAFF_DOMAIN ?? "mcsond.ng").toLowerCase();
 
@@ -69,50 +68,16 @@ export const auth = betterAuth({
       kyc: { type: "string", required: false, input: false, defaultValue: "unverified" },
     },
   },
+  // Google is the only sign-in method. Email/password is deliberately off:
+  // Google accounts arrive verified, so there is no verification or reset flow
+  // to maintain, and staff gating by domain stays reliable.
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-    },
-  },
-  // Email + password is a first-class sign-in method (Google OAuth stays as an
-  // alternative). Verification is sent best-effort but NOT required to sign in:
-  // until EMAIL_FROM is a verified-domain sender, Resend's test address only
-  // delivers to the Resend account owner — requiring verification would lock
-  // everyone else out.
-  emailAndPassword: {
-    enabled: true,
-    minPasswordLength: 8,
-    revokeSessionsOnPasswordReset: true,
-    resetPasswordTokenExpiresIn: 60 * 30, // 30 minutes, single-use
-    sendResetPassword: async ({ user, url }) => {
-      // Best-effort: sendAuthEmail never throws, so the flow's timing-attack
-      // protections and constant responses stay intact.
-      await sendAuthEmail({
-        to: user.email,
-        subject: "Reset your McSond Insurance password",
-        heading: "Reset your password",
-        body: "Someone (hopefully you) asked to reset the password for this account. The link is valid for 30 minutes.",
-        ctaLabel: "Choose a new password",
-        ctaUrl: url,
-      });
-    },
-  },
-  emailVerification: {
-    // Verification has never been required to sign in, so with no mail provider
-    // configured we skip the send outright rather than queueing a no-op.
-    sendOnSignUp: isEmailConfigured(),
-    autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url }) => {
-      // Fire-and-forget: verification is best-effort and must not slow sign-up.
-      void sendAuthEmail({
-        to: user.email,
-        subject: "Verify your McSond Insurance email",
-        heading: "Confirm it's you",
-        body: "Tap the button below to verify this email address for your McSond Insurance account.",
-        ctaLabel: "Verify email",
-        ctaUrl: url,
-      });
+      // Always show Google's account chooser — a browser signed into one Google
+      // account would otherwise be picked silently (see the alidauda14 / ali.biu mix-up).
+      prompt: "select_account",
     },
   },
   session: {

@@ -19,7 +19,7 @@ export type InviteResult = { ok: boolean; message: string };
  * Invite a staff member by email + role (superadmin only — user:create).
  * - If the email already has an account, update its role immediately.
  * - Otherwise record a pending invite (assigned on first Google sign-in via the
- *   create hook in lib/auth.ts) and send the invitation email via Resend.
+ *   create hook in lib/auth.ts) and send the invitation email over SMTP (lib/email.ts).
  */
 export async function inviteStaff(emailRaw: string, role: StaffRole): Promise<InviteResult> {
   const actor = await requirePermission({ user: ["create"] });

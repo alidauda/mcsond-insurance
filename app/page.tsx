@@ -4,7 +4,6 @@ import { Logo, Wordmark } from "@/components/Logo";
 import { Icon } from "@/components/icons";
 import { Eyebrow, Avatar } from "@/components/ui";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
-import { EmailPasswordForm } from "@/components/EmailPasswordForm";
 import { signIn } from "@/lib/mock-data";
 import { getSession } from "@/lib/server-session";
 import { STAFF_ROLES } from "@/lib/permissions";
@@ -68,14 +67,12 @@ export default async function SignInPage() {
               Welcome <em className="italic text-crimson">back.</em>
             </h2>
             <p className="mt-3 text-base text-muted">
-              Sign in to compare quotes, bind cover and download your certificates.
+              Sign in with your Google account to compare quotes, bind cover and download your certificates.
             </p>
 
             <div className="mt-9">
               <GoogleSignInButton />
             </div>
-
-            <EmailPasswordForm />
 
             <hr className="my-7 border-0 border-t border-line" />
 

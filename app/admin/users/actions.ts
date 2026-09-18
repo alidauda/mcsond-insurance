@@ -7,6 +7,8 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kycProfile } from "@/lib/schema";
+import { user } from "@/lib/auth-schema";
+import { sendKycOutcomeEmail } from "@/lib/email";
 import { runKycVerification, type KycResult } from "@/lib/kyc";
 import { requirePermission } from "@/lib/server-session";
 import type { Role } from "@/lib/permissions";
@@ -103,6 +105,9 @@ export async function decideKycReview(userId: string, decision: "approve" | "rej
       ...(approved ? {} : { photoData: null, photoOnFile: false }),
     })
     .where(eq(kycProfile.userId, userId));
+
+  const [customer] = await db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, userId)).limit(1);
+  if (customer) void sendKycOutcomeEmail({ to: customer.email, name: customer.name, outcome: approved ? "approved" : "rejected" });
 
   revalidatePath(`/admin/users/${userId}`);
   revalidatePath("/admin/users");

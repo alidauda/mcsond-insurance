@@ -11,9 +11,9 @@ separate database, no shared code.
 ## Stack
 
 - Next.js 16 (App Router, Server Actions) · React 19 · Tailwind v4
-- Better Auth (Google OAuth + email/password, admin plugin, RBAC)
+- Better Auth (Google OAuth only, admin plugin, RBAC)
 - PostgreSQL + Drizzle ORM
-- Paystack (wallet top-ups) · Resend (email)
+- Paystack (wallet top-ups) · Zoho Mail SMTP via nodemailer (email)
 
 ## Getting started
 

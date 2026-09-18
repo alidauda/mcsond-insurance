@@ -3,6 +3,8 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { and, eq, lt } from "drizzle-orm";
 import { db } from "./db";
 import { wallet, ledgerEntry, paystackTransaction } from "./schema";
+import { user } from "./auth-schema";
+import { sendTopupReceiptEmail } from "./email";
 import { verifyTransaction, TERMINAL_FAILURE_STATUSES } from "./paystack";
 
 /**
@@ -153,7 +155,8 @@ export async function creditPaystackTopup(params: {
   gatewayResponse?: string | null;
   paidAt?: string | null;
 }): Promise<TopupCreditResult> {
-  return db.transaction(async (tx) => {
+  const settled = await db.transaction(
+    async (tx): Promise<{ result: TopupCreditResult; userId?: string; amount?: number; balanceAfter?: number; paidAt?: Date }> => {
     // Lock the row before reading its status, so the state we decide on is the
     // state we act on. This is what serialises a concurrent webhook and
     // callback: the loser blocks here, then sees "success" and does nothing.
@@ -164,8 +167,8 @@ export async function creditPaystackTopup(params: {
       .limit(1)
       .for("update");
 
-    if (!row) return "unknown-reference"; // not one of our top-ups
-    if (row.status === "success") return "already-processed";
+    if (!row) return { result: "unknown-reference" }; // not one of our top-ups
+    if (row.status === "success") return { result: "already-processed" };
 
     // Anything else — pending, or a row an earlier step wrote off as failed —
     // is still creditable. Only a credited row is terminal.
@@ -188,7 +191,8 @@ export async function creditPaystackTopup(params: {
     // requested amount, so that's what the wallet gets. Cap at the request;
     // credit less only if the customer somehow paid less (partial payment).
     const amountNaira = Math.min(Math.floor(params.paidKobo / 100), row.amount);
-    await applyWalletMovement(tx, {
+    const paidAt = params.paidAt ? new Date(params.paidAt) : new Date();
+    const posted = await applyWalletMovement(tx, {
       userId: row.userId,
       amount: amountNaira,
       type: "topup",
@@ -202,10 +206,28 @@ export async function creditPaystackTopup(params: {
       console.warn(
         `[wallet] RECOVERED top-up ${params.reference}: credited ₦${amountNaira.toLocaleString("en-NG")} to a transaction previously marked "${row.status}".`,
       );
-      return "recovered";
+      return { result: "recovered", userId: row.userId, amount: amountNaira, balanceAfter: posted.balanceAfter, paidAt };
     }
-    return "credited";
+    return { result: "credited", userId: row.userId, amount: amountNaira, balanceAfter: posted.balanceAfter, paidAt };
   });
+
+  // Receipt — only on the one call that actually credited (the idempotent gate
+  // above means a webhook + callback pair sends exactly one). Fire-and-forget.
+  if (settled.userId && settled.amount !== undefined) {
+    const [customer] = await db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, settled.userId)).limit(1);
+    if (customer) {
+      void sendTopupReceiptEmail({
+        to: customer.email,
+        name: customer.name,
+        amount: settled.amount,
+        balanceAfter: settled.balanceAfter ?? 0,
+        reference: params.reference,
+        channel: params.channel,
+        paidAt: settled.paidAt ?? new Date(),
+      });
+    }
+  }
+  return settled.result;
 }
 
 export type ReconcileResult = {

@@ -13,20 +13,22 @@
     "auth:generate": "npx @better-auth/cli@latest generate --config lib/auth.ts --output lib/auth-schema.ts",
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:run": "node --env-file=.env scripts/migrate.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "email:test": "node --env-file=.env scripts/email-test.mjs"
   },
   "dependencies": {
     "better-auth": "^1.6.20",
     "drizzle-orm": "^0.45.2",
     "next": "16.2.9",
+    "nodemailer": "^10.0.10",
     "pg": "^8.22.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "resend": "^6.12.4"
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",

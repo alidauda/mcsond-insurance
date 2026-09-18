@@ -3,6 +3,8 @@ import { randomUUID, randomInt } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { order, insurancePolicy, insurancePlan, underwriterTransaction, wallet } from "./schema";
+import { user } from "./auth-schema";
+import { sendPolicyIssuedEmail } from "./email";
 // McSond is a broker: every policy here is priced and issued by an
 // underwriter's API. Nothing in this module invents a policy number.
 import { applyWalletMovement } from "./wallet-mutations";
@@ -297,6 +299,29 @@ export async function bindMotorPolicy(params: MotorBindParams): Promise<BoundMot
     .from(wallet)
     .where(eq(wallet.userId, params.userId))
     .limit(1);
+
+  // Certificate email — fire-and-forget, the policy is already bound.
+  const [customer] = await db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, params.userId)).limit(1);
+  if (customer) {
+    void sendPolicyIssuedEmail({
+      to: customer.email,
+      name: customer.name,
+      reference,
+      planName: plan.name ?? "Motor policy",
+      underwriter,
+      policyNo: result.policyNo ?? null,
+      regNo: params.vehicle.regNo,
+      vehicle: details.vehicle,
+      periodStart,
+      periodEnd,
+      basePremium: pricing.basePremium,
+      stampDuty: pricing.stampDuty,
+      vat: pricing.vat,
+      total: pricing.total,
+      balanceAfter: w?.balance ?? 0,
+      boundAt,
+    });
+  }
 
   return {
     reference,
