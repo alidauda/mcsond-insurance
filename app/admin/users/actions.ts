@@ -101,8 +101,9 @@ export async function decideKycReview(userId: string, decision: "approve" | "rej
       verifiedAt: approved ? now : null,
       reviewedBy: reviewer.id,
       reviewedAt: now,
-      // A rejected record isn't this customer's — drop the biometric data.
-      ...(approved ? {} : { photoData: null, photoOnFile: false }),
+      // A rejected record isn't this customer's — drop the biometric data and
+      // release the identity so its real owner can still verify with it.
+      ...(approved ? {} : { photoData: null, photoOnFile: false, identityHash: null }),
     })
     .where(eq(kycProfile.userId, userId));
 

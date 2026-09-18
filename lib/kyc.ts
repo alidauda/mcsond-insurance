@@ -1,10 +1,10 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
-import { desc, eq } from "drizzle-orm";
+import { randomUUID, createHmac } from "node:crypto";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "./db";
 import { kycProfile, kycVerification, auditEntry } from "./schema";
 import { user } from "./auth-schema";
-import { sendKycOutcomeEmail } from "./email";
+import { sendKycOutcomeEmail, sendIdentityReuseAlertEmail } from "./email";
 import {
   verifyByNin,
   verifyByPhone,
@@ -112,6 +112,64 @@ export function scoreNameMatch(accountName: string, verifiedName: string): numbe
     total += best;
   }
   return Math.round((total / shorter.length) * 100);
+}
+
+/* ───────────────────────── one account per identity ───────────────────────── */
+
+const DUPLICATE_IDENTITY_MESSAGE =
+  "This identity is already verified on another McSond Insurance account. If that account is yours, sign in with it instead. If you think someone else used your details, contact support.";
+
+let warnedNoHashKey = false;
+
+/**
+ * Stable, keyed fingerprint of a verified identity. HMAC-SHA256 under a server
+ * secret, so the stored value can be compared for equality but never reversed
+ * to a NIN. Prefer the NIN; fall back to the provider's pseudo-id, then to
+ * name + DOB + gender (weaker, but still catches the obvious repeat).
+ * Returns null only when no key is configured — then the check is skipped.
+ */
+export function identityFingerprint(identity: Pick<VerifiedIdentity, "nin" | "pseudoId" | "fullName" | "dateOfBirth" | "gender">): string | null {
+  const key = process.env.KYC_HASH_SECRET ?? process.env.BETTER_AUTH_SECRET;
+  if (!key) {
+    if (!warnedNoHashKey) {
+      warnedNoHashKey = true;
+      console.warn("[kyc] KYC_HASH_SECRET / BETTER_AUTH_SECRET not set — duplicate-identity protection is off.");
+    }
+    return null;
+  }
+  const nin = identity.nin?.replace(/\D/g, "");
+  let material: string;
+  if (nin && nin.length >= 10) material = `nin:${nin}`;
+  else if (identity.pseudoId) material = `pid:${identity.pseudoId}`;
+  else if (identity.fullName && identity.dateOfBirth) {
+    material = `demo:${nameTokens(identity.fullName).sort().join(" ")}|${identity.dateOfBirth}|${(identity.gender ?? "").toLowerCase()}`;
+  } else return null;
+  return createHmac("sha256", key).update(material).digest("hex");
+}
+
+/** Another account (verified or awaiting review) already holds this identity? */
+async function findIdentityOwner(fingerprint: string, exceptUserId: string) {
+  const rows = await db
+    .select({ userId: kycProfile.userId, email: user.email, name: user.name, kyc: user.kyc })
+    .from(kycProfile)
+    .innerJoin(user, eq(user.id, kycProfile.userId))
+    .where(
+      and(
+        eq(kycProfile.identityHash, fingerprint),
+        ne(kycProfile.userId, exceptUserId),
+        inArray(user.kyc, ["verified", "pending"]),
+      ),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Postgres unique-violation on the identity index (two checks raced). */
+function isIdentityHashCollision(err: unknown): boolean {
+  const e = err as { code?: string; constraint?: string; cause?: { code?: string; constraint?: string } };
+  const code = e?.code ?? e?.cause?.code;
+  const constraint = e?.constraint ?? e?.cause?.constraint;
+  return code === "23505" && constraint === "kyc_profile_identity_hash_unique";
 }
 
 /* ───────────────────────── running a check ───────────────────────── */
@@ -226,6 +284,12 @@ export async function runKycVerification(params: {
     return { outcome: "failed", message, nameMatchScore: null };
   }
 
+  // One identity, one account. Checked before the name match: whose record it
+  // is matters more than how well the name lines up.
+  const fingerprint = identityFingerprint(identity);
+  const owner = fingerprint ? await findIdentityOwner(fingerprint, userId) : null;
+  if (owner) return blockDuplicate({ userId, account, owner, method, redactedRequest, identity, actorId });
+
   const score = scoreNameMatch(account.name, identity.fullName);
   const outcome: KycOutcome =
     score >= AUTO_VERIFY_SCORE ? "verified" : score >= REVIEW_SCORE ? "review" : "failed";
@@ -239,6 +303,7 @@ export async function runKycVerification(params: {
   const now = new Date();
   const redactedResponse = redactIdentity(identity);
 
+  try {
   await db.transaction(async (tx) => {
     // Only a clean match writes identity evidence to the profile; a mismatch
     // is recorded in the attempt log only.
@@ -257,6 +322,7 @@ export async function runKycVerification(params: {
         nameMatchScore: score,
         providerRequestId: identity.requestId,
         providerConsentId: identity.consentId,
+        identityHash: fingerprint,
         verifiedAt: outcome === "verified" ? now : null,
         // An automatic pass has no human reviewer.
         reviewedBy: null,
@@ -283,6 +349,15 @@ export async function runKycVerification(params: {
       createdAt: now,
     });
   });
+  } catch (err) {
+    // Two accounts verified the same identity at the same instant; the unique
+    // index caught what the pre-check couldn't. Same verdict as the pre-check.
+    if (isIdentityHashCollision(err) && fingerprint) {
+      const racedOwner = await findIdentityOwner(fingerprint, userId);
+      if (racedOwner) return blockDuplicate({ userId, account, owner: racedOwner, method, redactedRequest, identity, actorId });
+    }
+    throw err;
+  }
 
   await logAttempt({
     userId,
@@ -312,6 +387,51 @@ export async function runKycVerification(params: {
       ninMasked: maskNin(identity.nin),
     },
   };
+}
+
+/**
+ * Refuse a check because the identity already belongs to another account:
+ * log it, leave an audit trail naming both accounts (staff-only), tell the
+ * customer without revealing whose it is, and warn the real owner.
+ */
+async function blockDuplicate(p: {
+  userId: string;
+  account: { email: string; name: string };
+  owner: { userId: string; email: string; name: string };
+  method: KycMethod;
+  redactedRequest: Record<string, unknown>;
+  identity: VerifiedIdentity;
+  actorId: string | null;
+}): Promise<KycResult> {
+  await Promise.all([
+    logAttempt({
+      userId: p.userId,
+      method: p.method,
+      outcome: "failed",
+      code: "duplicate-identity",
+      message: DUPLICATE_IDENTITY_MESSAGE,
+      nameMatchScore: null,
+      requestId: p.identity.requestId,
+      consentId: p.identity.consentId,
+      request: p.redactedRequest,
+      response: { ninMasked: maskNin(p.identity.nin), alreadyLinkedTo: p.owner.userId },
+      actorId: p.actorId,
+    }),
+    db.insert(auditEntry).values({
+      id: randomUUID(),
+      actorId: p.actorId,
+      actorName: p.actorId ? "Staff" : p.account.name,
+      action: "KYC blocked · identity already linked",
+      actionTone: "danger",
+      targetType: "user",
+      targetRef: p.account.email,
+      detail: `${KYC_METHOD_LABEL[p.method]} check returned an identity (NIN ${maskNin(p.identity.nin) ?? "n/a"}) already held by ${p.owner.email}`,
+      createdAt: new Date(),
+    }),
+  ]);
+  void sendKycOutcomeEmail({ to: p.account.email, name: p.account.name, outcome: "duplicate" });
+  void sendIdentityReuseAlertEmail({ to: p.owner.email, name: p.owner.name });
+  return { outcome: "failed", message: DUPLICATE_IDENTITY_MESSAGE, nameMatchScore: null };
 }
 
 /* ───────────────────────── reads ───────────────────────── */

@@ -150,7 +150,7 @@ const firstName = (name: string) => name.trim().split(/\s+/)[0] || "there";
 const dateLong = (d: Date) =>
   d.toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" });
 
-export type KycEmailOutcome = "verified" | "review" | "failed" | "approved" | "rejected";
+export type KycEmailOutcome = "verified" | "review" | "failed" | "approved" | "rejected" | "duplicate";
 
 /** Tell the customer how their identity check ended (automatic or reviewed). */
 export function sendKycOutcomeEmail(opts: { to: string; name: string; outcome: KycEmailOutcome }): Promise<SendResult> {
@@ -183,6 +183,13 @@ export function sendKycOutcomeEmail(opts: { to: string; name: string; outcome: K
       body: "The name on the record we found doesn't match the name on your account. Check that your account name matches your ID exactly, then run the check again with your own identity details.",
       ctaLabel: "Try again",
       path: "/kyc",
+    },
+    duplicate: {
+      subject: "That identity is already linked to another account",
+      heading: `We couldn't link that identity, ${hi}.`,
+      body: "The identity you verified with is already linked to another McSond Insurance account. If that account is yours, sign in with it instead — each person can hold one verified account. If you believe someone else has used your details, reply to this email and our team will investigate.",
+      ctaLabel: "Back to sign in",
+      path: "/",
     },
     rejected: {
       subject: "Your identity check was not approved",
@@ -228,6 +235,19 @@ async function sendReceiptEmail(opts: {
       `${opts.ctaLabel}: ${opts.ctaUrl}`,
       footer,
     ].join("\n"),
+  });
+}
+
+/** Someone tried to verify a different account with this customer's identity. */
+export function sendIdentityReuseAlertEmail(opts: { to: string; name: string }): Promise<SendResult> {
+  return sendNotificationEmail({
+    to: opts.to,
+    subject: "Security notice: your identity details were used on another account",
+    heading: `A quick security check, ${firstName(opts.name)}.`,
+    body: "Someone just tried to verify a different McSond Insurance account using your identity details. We refused it — your account is unaffected and still verified. If that was you setting up a second account, note that each person can hold one verified account. If it wasn't, reply to this email so our team can look into it.",
+    ctaLabel: "Review your account",
+    ctaUrl: appUrl("/dashboard"),
+    footer: "You're receiving this because your identity is verified on a McSond Insurance account.",
   });
 }
 

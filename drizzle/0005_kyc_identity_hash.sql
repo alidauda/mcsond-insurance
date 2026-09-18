@@ -1,0 +1,2 @@
+ALTER TABLE "kyc_profile" ADD COLUMN "identityHash" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "kyc_profile_identity_hash_unique" ON "kyc_profile" USING btree ("identityHash") WHERE "kyc_profile"."identityHash" is not null;

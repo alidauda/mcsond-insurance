@@ -18,7 +18,9 @@ import {
   boolean,
   jsonb,
   bigserial,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { user } from "./auth-schema";
 
@@ -297,12 +299,24 @@ export const kycProfile = pgTable("kyc_profile", {
   nameMatchScore: integer("nameMatchScore"),
   providerRequestId: text("providerRequestId"),
   providerConsentId: text("providerConsentId"),
+  // Keyed hash (HMAC) of the government identity — the NIN when the provider
+  // returns it, else its pseudo-id, else name+DOB+gender. It lets us refuse the
+  // same person verifying a second account without ever storing the raw NIN.
+  // Cleared when a review is rejected so the real owner can still claim it.
+  identityHash: text("identityHash"),
   verifiedAt: timestamp("verifiedAt"),
   reviewedBy: text("reviewedBy").references(() => user.id, {
     onDelete: "set null",
   }),
   reviewedAt: timestamp("reviewedAt"),
-});
+}, (t) => [
+  // One account per identity. Partial: rows without a hash (legacy / rejected)
+  // don't participate. The pre-check in lib/kyc.ts gives the friendly message;
+  // this closes the race between two simultaneous checks.
+  uniqueIndex("kyc_profile_identity_hash_unique")
+    .on(t.identityHash)
+    .where(sql`${t.identityHash} is not null`),
+]);
 
 // 9b. kyc_verification — append-only log of every identity check attempted.
 // Request and response are stored redacted (see lib/swiftcheck.ts).
