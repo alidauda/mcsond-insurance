@@ -34,6 +34,13 @@ export const user = pgTable("user", {
   company: text("company"),
   // KYC status: verified | pending | unverified. Only staff change it.
   kyc: text("kyc").$defaultFn(() => "unverified"),
+  // Identity details the customer DECLARES before any check runs (see
+  // lib/kyc.ts). Compared against the national record so that matching a
+  // name alone can never claim someone's identity. Locked once linked.
+  phone: text("phone"),
+  dateOfBirth: text("dateOfBirth"), // YYYY-MM-DD
+  gender: text("gender"), // m | f
+  stateOfOrigin: text("stateOfOrigin"),
 });
 
 export const session = pgTable("session", {

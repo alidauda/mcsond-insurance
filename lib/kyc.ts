@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID, createHmac } from "node:crypto";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "./db";
 import { kycProfile, kycVerification, auditEntry } from "./schema";
 import { user } from "./auth-schema";
@@ -21,6 +21,8 @@ import {
   type VerifiedIdentity,
 } from "./swiftcheck";
 import type { KycStatus } from "./mock-data";
+import { normalisePhone } from "./nigeria";
+import { isDeclarationComplete } from "./kyc-shared";
 
 /**
  * KYC domain logic: run an identity check, decide whether it clears, and
@@ -37,14 +39,20 @@ import type { KycStatus } from "./mock-data";
 export const AUTO_VERIFY_SCORE = 85;
 export const REVIEW_SCORE = 55;
 
+/** Customer-initiated checks allowed per rolling 24h. Keeps a declared date
+ * of birth from being guessed by retrying. Staff-run checks don't count. */
+export const MAX_ATTEMPTS_PER_DAY = 5;
+
 export type KycOutcome = "verified" | "review" | "failed";
 
 export type KycResult = {
   outcome: KycOutcome;
-  /** Customer-facing explanation. Never contains provider internals. */
+  /** Customer-facing explanation. Never contains provider internals, and never
+   * the record's details unless the check verified — a failed attempt must not
+   * teach an impostor what the record says. */
   message: string;
   nameMatchScore: number | null;
-  /** Only set when the check reached the provider and returned an identity. */
+  /** Only set when the check VERIFIED. */
   identity?: {
     fullName: string;
     dateOfBirth: string | null;
@@ -112,6 +120,77 @@ export function scoreNameMatch(accountName: string, verifiedName: string): numbe
     total += best;
   }
   return Math.round((total / shorter.length) * 100);
+}
+
+/* ───────────────────────── declared identity ───────────────────────── */
+
+/** What the customer told us about themselves before any check ran. */
+export type DeclaredIdentity = {
+  phone: string | null;
+  dateOfBirth: string | null; // YYYY-MM-DD
+  gender: "m" | "f" | null;
+  stateOfOrigin: string | null;
+};
+
+export async function getDeclaredIdentity(userId: string): Promise<DeclaredIdentity> {
+  const [row] = await db
+    .select({ phone: user.phone, dateOfBirth: user.dateOfBirth, gender: user.gender, stateOfOrigin: user.stateOfOrigin })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  return {
+    phone: row?.phone ?? null,
+    dateOfBirth: row?.dateOfBirth ?? null,
+    gender: row?.gender === "m" || row?.gender === "f" ? row.gender : null,
+    stateOfOrigin: row?.stateOfOrigin ?? null,
+  };
+}
+
+export { isDeclarationComplete } from "./kyc-shared";
+
+/** NIMC returns DD-MM-YYYY; we store YYYY-MM-DD. Compare as ISO. */
+function recordDobToIso(dob: string | null): string | null {
+  if (!dob) return null;
+  const m = dob.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return /^\d{4}-\d{2}-\d{2}$/.test(dob.trim()) ? dob.trim() : null;
+}
+
+function normaliseGender(g: string | null): "m" | "f" | null {
+  const v = g?.trim().toLowerCase();
+  if (!v) return null;
+  if (v === "m" || v.startsWith("male")) return "m";
+  if (v === "f" || v.startsWith("female")) return "f";
+  return null;
+}
+
+export type DeclaredMatches = { dob: boolean | null; gender: boolean | null; phone: boolean | null };
+
+/** Compare what was declared with what the register returned. null = can't say. */
+export function compareDeclared(declared: DeclaredIdentity, identity: VerifiedIdentity): DeclaredMatches {
+  const recordDob = recordDobToIso(identity.dateOfBirth);
+  const recordGender = normaliseGender(identity.gender);
+  const recordPhone = identity.phone ? normalisePhone(identity.phone) : null;
+  const declaredPhone = declared.phone ? normalisePhone(declared.phone) : null;
+  return {
+    dob: declared.dateOfBirth && recordDob ? declared.dateOfBirth === recordDob : null,
+    gender: declared.gender && recordGender ? declared.gender === recordGender : null,
+    phone: declaredPhone && recordPhone ? declaredPhone === recordPhone : null,
+  };
+}
+
+const DETAILS_REQUIRED_MESSAGE = "Add your phone number, date of birth, gender and state of origin first, so we know who we're verifying.";
+const DETAILS_MISMATCH_MESSAGE =
+  "The details on your profile don't match the identity record we found. Check that your name, date of birth and gender are exactly as they appear on your NIN, then try again.";
+const TOO_MANY_ATTEMPTS_MESSAGE = "You've reached the limit of identity checks for today. Try again tomorrow, or contact support if you need help.";
+
+async function attemptsInLast24h(userId: string): Promise<number> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(kycVerification)
+    .where(and(eq(kycVerification.userId, userId), isNull(kycVerification.actorId), gt(kycVerification.createdAt, since)));
+  return row?.n ?? 0;
 }
 
 /* ───────────────────────── one account per identity ───────────────────────── */
@@ -198,6 +277,16 @@ function requestBodyFor(input: KycInput): Record<string, unknown> {
   }
 }
 
+/**
+ * Test seam: lets a test substitute the provider so the decision logic can be
+ * exercised without SwiftCheck. Refused in production.
+ */
+let lookupImpl: (input: KycInput) => Promise<VerifiedIdentity> = lookup;
+export function __setKycLookupForTests(fn: ((input: KycInput) => Promise<VerifiedIdentity>) | null) {
+  if (process.env.NODE_ENV === "production") throw new Error("Not available in production.");
+  lookupImpl = fn ?? lookup;
+}
+
 async function lookup(input: KycInput): Promise<VerifiedIdentity> {
   switch (input.method) {
     case "nin":
@@ -261,9 +350,21 @@ export async function runKycVerification(params: {
   const [account] = await db.select().from(user).where(eq(user.id, userId)).limit(1);
   if (!account) throw new Error("USER_NOT_FOUND");
 
+  // Who are we verifying? The customer must have said before we look anything
+  // up, or a name match alone could claim a stranger's record. A staff-run
+  // check may proceed without it, but then can never clear automatically.
+  const declared = await getDeclaredIdentity(userId);
+  const declarationComplete = isDeclarationComplete(declared);
+  if (!declarationComplete && !actorId) {
+    return { outcome: "failed", message: DETAILS_REQUIRED_MESSAGE, nameMatchScore: null };
+  }
+  if (!actorId && (await attemptsInLast24h(userId)) >= MAX_ATTEMPTS_PER_DAY) {
+    return { outcome: "failed", message: TOO_MANY_ATTEMPTS_MESSAGE, nameMatchScore: null };
+  }
+
   let identity: VerifiedIdentity;
   try {
-    identity = await lookup(input);
+    identity = await lookupImpl(input);
   } catch (err) {
     // A 403 means the business isn't entitled to this method — stop offering it.
     if (err instanceof SwiftCheckApiError && err.isNotEntitled) markMethodUnavailable(method);
@@ -291,14 +392,23 @@ export async function runKycVerification(params: {
   if (owner) return blockDuplicate({ userId, account, owner, method, redactedRequest, identity, actorId });
 
   const score = scoreNameMatch(account.name, identity.fullName);
+  const matches = compareDeclared(declared, identity);
+  // Hard gates: a declared date of birth or gender that contradicts the record
+  // is a different person, however well the name lines up.
+  const contradicted = matches.dob === false || matches.gender === false;
   const outcome: KycOutcome =
-    score >= AUTO_VERIFY_SCORE ? "verified" : score >= REVIEW_SCORE ? "review" : "failed";
+    score < REVIEW_SCORE || contradicted
+      ? "failed"
+      : score >= AUTO_VERIFY_SCORE && declarationComplete && matches.dob === true && matches.gender === true
+        ? "verified"
+        : "review";
+  // Never echo the record back on a failure — see KycResult.message.
   const message =
     outcome === "verified"
       ? "Identity verified — your account is now fully activated."
       : outcome === "review"
-        ? "We found your record, but the name doesn't match your account closely enough to clear automatically. A reviewer will check it shortly."
-        : `The name on that record (${identity.fullName}) doesn't match the name on this account. Update your account name or use your own identity details.`;
+        ? "We found your record. Some details need a human to confirm, so a reviewer will check it shortly — usually within one business day."
+        : DETAILS_MISMATCH_MESSAGE;
 
   const now = new Date();
   const redactedResponse = redactIdentity(identity);
@@ -313,6 +423,8 @@ export async function runKycVerification(params: {
         ninMasked: maskNin(identity.nin),
         ninVerified: outcome === "verified",
         verifiedName: identity.fullName,
+        verifiedFirstName: identity.firstName || null,
+        verifiedLastName: [identity.middleName, identity.lastName].filter(Boolean).join(" ") || null,
         verifiedDob: identity.dateOfBirth,
         verifiedGender: identity.gender,
         verifiedPhone: identity.phone,
@@ -320,6 +432,9 @@ export async function runKycVerification(params: {
         photoOnFile: identity.hasPhoto,
         photoData: identity.photoBase64,
         nameMatchScore: score,
+        dobMatch: matches.dob,
+        genderMatch: matches.gender,
+        phoneMatch: matches.phone,
         providerRequestId: identity.requestId,
         providerConsentId: identity.consentId,
         identityHash: fingerprint,
@@ -345,7 +460,7 @@ export async function runKycVerification(params: {
       actionTone: outcome === "failed" ? "danger" : "neutral",
       targetType: "user",
       targetRef: account.email,
-      detail: `${KYC_METHOD_LABEL[method]} check · name match ${score}%`,
+      detail: `${KYC_METHOD_LABEL[method]} check · name match ${score}% · DOB ${matchWord(matches.dob)} · gender ${matchWord(matches.gender)}`,
       createdAt: now,
     });
   });
@@ -381,12 +496,14 @@ export async function runKycVerification(params: {
     outcome,
     message,
     nameMatchScore: score,
-    identity: {
-      fullName: identity.fullName,
-      dateOfBirth: identity.dateOfBirth,
-      ninMasked: maskNin(identity.nin),
-    },
+    ...(outcome === "verified"
+      ? { identity: { fullName: identity.fullName, dateOfBirth: identity.dateOfBirth, ninMasked: maskNin(identity.nin) } }
+      : {}),
   };
+}
+
+function matchWord(m: boolean | null): string {
+  return m === null ? "n/a" : m ? "match" : "MISMATCH";
 }
 
 /**
@@ -434,6 +551,53 @@ async function blockDuplicate(p: {
   return { outcome: "failed", message: DUPLICATE_IDENTITY_MESSAGE, nameMatchScore: null };
 }
 
+/* ───────────────────────── verified policyholder ───────────────────────── */
+
+/**
+ * The identity a VERIFIED customer's policies are issued in. Names, date of
+ * birth and sex come from the national record (never from the form); phone
+ * and state are what the customer declared. Null unless the account is verified.
+ */
+export type VerifiedPolicyholder = {
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  dob: string | null; // YYYY-MM-DD
+  sex: "male" | "female" | null;
+  phone: string | null;
+  stateOfOrigin: string | null;
+};
+
+export async function getVerifiedPolicyholder(userId: string): Promise<VerifiedPolicyholder | null> {
+  const [row] = await db
+    .select({ kyc: user.kyc, phone: user.phone, stateOfOrigin: user.stateOfOrigin, p: kycProfile })
+    .from(user)
+    .leftJoin(kycProfile, eq(kycProfile.userId, user.id))
+    .where(eq(user.id, userId))
+    .limit(1);
+  if (!row || row.kyc !== "verified" || !row.p?.verifiedName) return null;
+  const p = row.p;
+  // Older rows only carry the joined name — split on first space as a fallback.
+  const tokens = p.verifiedName!.trim().split(/\s+/);
+  const firstName = p.verifiedFirstName ?? tokens[0] ?? "";
+  const lastName = p.verifiedLastName ?? (tokens.slice(1).join(" ") || tokens[0] || "");
+  const g = normaliseGender(p.verifiedGender);
+  return {
+    firstName: titleCase(firstName),
+    lastName: titleCase(lastName),
+    fullName: titleCase(p.verifiedName!),
+    dob: recordDobToIso(p.verifiedDob),
+    sex: g === "m" ? "male" : g === "f" ? "female" : null,
+    phone: row.phone ?? (p.verifiedPhone ? normalisePhone(p.verifiedPhone) : null),
+    stateOfOrigin: row.stateOfOrigin ?? p.verifiedState ?? null,
+  };
+}
+
+/** NIMC returns names in capitals; certificates read better in title case. */
+function titleCase(s: string): string {
+  return s.toLowerCase().replace(/(^|[\s'-])\p{L}/gu, (m) => m.toUpperCase());
+}
+
 /* ───────────────────────── reads ───────────────────────── */
 
 export type KycEvidence = {
@@ -448,6 +612,9 @@ export type KycEvidence = {
   verifiedState: string | null;
   photoOnFile: boolean;
   nameMatchScore: number | null;
+  dobMatch: boolean | null;
+  genderMatch: boolean | null;
+  phoneMatch: boolean | null;
   requestId: string | null;
   consentId: string | null;
   verifiedAt: string | null;
@@ -494,6 +661,9 @@ export async function getKycEvidence(userId: string): Promise<KycEvidence | null
     verifiedState: p.verifiedState,
     photoOnFile: !!p.photoOnFile,
     nameMatchScore: p.nameMatchScore,
+    dobMatch: p.dobMatch ?? null,
+    genderMatch: p.genderMatch ?? null,
+    phoneMatch: p.phoneMatch ?? null,
     requestId: p.providerRequestId,
     consentId: p.providerConsentId,
     verifiedAt: p.verifiedAt ? new Date(p.verifiedAt).toISOString().slice(0, 16).replace("T", " ") : null,

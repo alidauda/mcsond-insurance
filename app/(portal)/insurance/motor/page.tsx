@@ -3,7 +3,7 @@ import { Card, Button } from "@/components/ui";
 import { getInsurancePlan } from "@/lib/catalog";
 import { getWalletBalance } from "@/lib/wallet";
 import { requireCustomer } from "@/lib/server-session";
-import { getKycStatus } from "@/lib/kyc";
+import { getKycStatus, getDeclaredIdentity, getVerifiedPolicyholder } from "@/lib/kyc";
 import {
   isNemConfigured,
   getVehicleTypes,
@@ -62,6 +62,7 @@ export default async function MotorQuotePage({
   // Only types NEM will write comprehensive cover for.
   const types = plan.productCode === "comp" ? vehicleTypes.filter((t) => t.comprehensive) : vehicleTypes;
   const [firstName, ...rest] = me.name.trim().split(/\s+/);
+  const [declared, verified] = await Promise.all([getDeclaredIdentity(me.id), getVerifiedPolicyholder(me.id)]);
 
   return (
     <MotorQuoteClient
@@ -70,9 +71,18 @@ export default async function MotorQuotePage({
       makes={makes}
       branches={branches}
       enhancedTypes={enhancedTypes}
-      defaults={{ firstName: firstName ?? "", lastName: rest.join(" "), email: me.email }}
+      defaults={{
+        firstName: firstName ?? "",
+        lastName: rest.join(" "),
+        email: me.email,
+        dob: declared.dateOfBirth ?? "",
+        sex: declared.gender === "m" ? "male" : declared.gender === "f" ? "female" : "",
+        phone: declared.phone ?? "",
+        state: declared.stateOfOrigin ?? "",
+      }}
       walletBalance={walletBalance}
       kycStatus={kycStatus}
+      verified={verified}
     />
   );
 }

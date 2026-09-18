@@ -286,6 +286,10 @@ export const kycProfile = pgTable("kyc_profile", {
   ninVerified: boolean("ninVerified").default(false),
   // Identity as returned by the provider, for the reviewer to compare.
   verifiedName: text("verifiedName"),
+  // Split form of verifiedName, so a policy can be issued in the record's own
+  // first/last names (middle name folded into last — underwriters take two).
+  verifiedFirstName: text("verifiedFirstName"),
+  verifiedLastName: text("verifiedLastName"),
   verifiedDob: text("verifiedDob"), // DD-MM-YYYY, as provided
   verifiedGender: text("verifiedGender"),
   verifiedPhone: text("verifiedPhone"),
@@ -297,6 +301,11 @@ export const kycProfile = pgTable("kyc_profile", {
   photoData: text("photoData"),
   // 0-100 similarity between the account name and the verified name.
   nameMatchScore: integer("nameMatchScore"),
+  // Declared-vs-record comparisons at the time of the check (null = not declared
+  // or not returned). DOB and gender are hard gates; phone is informational.
+  dobMatch: boolean("dobMatch"),
+  genderMatch: boolean("genderMatch"),
+  phoneMatch: boolean("phoneMatch"),
   providerRequestId: text("providerRequestId"),
   providerConsentId: text("providerConsentId"),
   // Keyed hash (HMAC) of the government identity — the NIN when the provider

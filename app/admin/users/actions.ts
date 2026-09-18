@@ -49,10 +49,9 @@ export async function setUserRole(userId: string, role: Role) {
  */
 export async function setUserKyc(userId: string, kyc: "verified" | "pending" | "unverified") {
   const reviewer = await requirePermission({ user: ["kyc"] });
-  await auth.api.adminUpdateUser({
-    headers: await headers(),
-    body: { userId, data: { kyc } },
-  });
+  // Direct write: KYC status is gated by our own user:kyc permission, not the
+  // admin plugin's user:update (which KYC reviewers deliberately don't hold).
+  await db.update(user).set({ kyc, updatedAt: new Date() }).where(eq(user.id, userId));
   const reviewedAt = kyc === "verified" ? new Date() : null;
   await db
     .insert(kycProfile)
@@ -90,10 +89,10 @@ export async function decideKycReview(userId: string, decision: "approve" | "rej
   const now = new Date();
   const approved = decision === "approve";
 
-  await auth.api.adminUpdateUser({
-    headers: await headers(),
-    body: { userId, data: { kyc: approved ? "verified" : "unverified" } },
-  });
+  await db
+    .update(user)
+    .set({ kyc: approved ? "verified" : "unverified", updatedAt: now })
+    .where(eq(user.id, userId));
   await db
     .update(kycProfile)
     .set({

@@ -6,7 +6,7 @@ import { UserActions } from "@/components/admin/UserActions";
 import { RevokeSessionsButton } from "@/components/admin/RevokeSessionsButton";
 import { auth } from "@/lib/auth";
 import { getUserDetail, type UserDetail } from "@/lib/admin-users";
-import { getKycEvidence, getKycAttempts, getKycPhoto, canViewKycPhoto, getLatestAttemptIdentity } from "@/lib/kyc";
+import { getKycEvidence, getKycAttempts, getKycPhoto, canViewKycPhoto, getLatestAttemptIdentity, getDeclaredIdentity } from "@/lib/kyc";
 import { KycPanel } from "@/components/admin/KycPanel";
 
 // Request-time only (no generateStaticParams): data depends on the live DB and
@@ -30,11 +30,12 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   const { id } = await params;
   const account = await getUserDetail(id);
   if (!account) notFound();
-  const [kycEvidence, kycAttempts, kycLatest, canSeePhoto] = await Promise.all([
+  const [kycEvidence, kycAttempts, kycLatest, canSeePhoto, declared] = await Promise.all([
     getKycEvidence(id),
     getKycAttempts(id, 8),
     getLatestAttemptIdentity(id),
     canViewKycPhoto(),
+    getDeclaredIdentity(id),
   ]);
   // Biometric data only loads for staff holding user:kyc.
   const kycPhoto = canSeePhoto ? await getKycPhoto(id) : null;
@@ -114,6 +115,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         attempts={kycAttempts}
         photo={kycPhoto}
         canViewPhoto={canSeePhoto}
+        declared={declared}
       />
 
       {/* Active session log */}

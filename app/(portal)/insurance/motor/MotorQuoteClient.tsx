@@ -9,6 +9,7 @@ import type { NemOption, NemVehicleType, NemEnhancedType } from "@/lib/nem";
 import type { NemProductCode } from "@/lib/mock-data";
 import { KycGate } from "@/components/KycGate";
 import type { KycStatus } from "@/lib/mock-data";
+import type { VerifiedPolicyholder } from "@/lib/kyc";
 import { bindMotorPolicyAction, loadVehicleModels, quotePremium, type MotorBindState } from "./actions";
 
 const inputCls =
@@ -42,15 +43,18 @@ export default function MotorQuoteClient({
   defaults,
   walletBalance,
   kycStatus,
+  verified,
 }: {
   plan: { id: string; name: string; underwriter: string; product: NemProductCode; features: string[] };
   vehicleTypes: NemVehicleType[];
   makes: NemOption[];
   branches: NemOption[];
   enhancedTypes: NemEnhancedType[];
-  defaults: { firstName: string; lastName: string; email: string };
+  defaults: { firstName: string; lastName: string; email: string; dob: string; sex: string; phone: string; state: string };
   walletBalance: number;
   kycStatus: KycStatus;
+  /** Set when the account is KYC-verified: identity comes from the national record, not the form. */
+  verified: VerifiedPolicyholder | null;
 }) {
   const [state, formAction, pending] = useActionState<MotorBindState, FormData>(bindMotorPolicyAction, null);
 
@@ -141,37 +145,61 @@ export default function MotorQuoteClient({
           {/* ── Policyholder ── */}
           <Card className="p-6">
             <SectionLabel className="mb-5">Policyholder</SectionLabel>
+
+            {verified && (
+              // Identity is settled by KYC — shown, not typed. The server takes
+              // these from the national record regardless of what's posted.
+              <div className="mb-5 rounded-[12px] border border-success/30 bg-success-bg p-4">
+                <p className="flex items-center gap-2 text-sm font-semibold text-success">
+                  <Icon name="shieldCheck" className="size-4" /> From your verified identity
+                </p>
+                <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+                  <Summary label="Policyholder" value={verified.fullName} />
+                  <Summary label="Date of birth" value={verified.dob ?? "—"} />
+                  <Summary label="Sex" value={verified.sex ? verified.sex[0].toUpperCase() + verified.sex.slice(1) : "—"} />
+                  <Summary label="Phone" value={verified.phone ?? "—"} />
+                </dl>
+                <p className="mt-3 text-xs text-success/80">
+                  These are passed to the underwriter exactly as they appear on your NIN. You only fill in what we don&rsquo;t hold.
+                </p>
+              </div>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-6">
               <Field label="Title" className="sm:col-span-1">
-                <select name="title" defaultValue="Mr" className={inputCls}>
+                <select name="title" defaultValue={verified?.sex === "female" ? "Mrs" : "Mr"} className={inputCls}>
                   {TITLES.map((t) => (
                     <option key={t}>{t}</option>
                   ))}
                 </select>
               </Field>
-              <Field label="First name" className="sm:col-span-2">
-                <input name="firstName" defaultValue={defaults.firstName} required className={inputCls} />
-              </Field>
-              <Field label="Last name" className="sm:col-span-3">
-                <input name="lastName" defaultValue={defaults.lastName} required className={inputCls} />
-              </Field>
-              <Field label="Date of birth" className="sm:col-span-2">
-                <input type="date" name="dob" max={isoToday()} required className={inputCls} />
-              </Field>
-              <Field label="Sex" className="sm:col-span-1">
-                <select name="sex" defaultValue="male" className={inputCls}>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </Field>
-              <Field label="Phone" className="sm:col-span-3">
-                <input type="tel" name="phone" placeholder="08034821190" required className={inputCls} />
+              {!verified && (
+                <>
+                  <Field label="First name" className="sm:col-span-2">
+                    <input name="firstName" defaultValue={defaults.firstName} required className={inputCls} />
+                  </Field>
+                  <Field label="Last name" className="sm:col-span-3">
+                    <input name="lastName" defaultValue={defaults.lastName} required className={inputCls} />
+                  </Field>
+                  <Field label="Date of birth" className="sm:col-span-2">
+                    <input type="date" name="dob" max={isoToday()} defaultValue={defaults.dob} required className={inputCls} />
+                  </Field>
+                  <Field label="Sex" className="sm:col-span-1">
+                    <select name="sex" defaultValue={defaults.sex || "male"} className={inputCls}>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </Field>
+                </>
+              )}
+              <Field label="Phone" className={verified ? "sm:col-span-5" : "sm:col-span-3"}>
+                <input type="tel" name="phone" placeholder="08034821190" defaultValue={verified?.phone ?? defaults.phone} required className={inputCls} />
               </Field>
               <Field label="Residential address" className="sm:col-span-6">
                 <input name="address" placeholder="Plot / street, area, city" required className={inputCls} />
               </Field>
-              <Field label="State" className="sm:col-span-2">
-                <input name="state" placeholder="Lagos" required className={inputCls} />
+              <Field label="State of residence" className="sm:col-span-2">
+                <input name="state" placeholder="Lagos" defaultValue={verified?.stateOfOrigin ?? defaults.state} required className={inputCls} />
               </Field>
               <Field label="Occupation" className="sm:col-span-2">
                 <input name="occupation" placeholder="Procurement manager" required className={inputCls} />
@@ -180,7 +208,7 @@ export default function MotorQuoteClient({
                 <input name="companyName" placeholder="Insured company, if any" className={inputCls} />
               </Field>
               <Field label="ID type" className="sm:col-span-2">
-                <select name="idType" defaultValue={ID_TYPES[0]} className={inputCls}>
+                <select name="idType" defaultValue={verified ? "National ID (NIN)" : ID_TYPES[0]} className={inputCls}>
                   {ID_TYPES.map((t) => (
                     <option key={t}>{t}</option>
                   ))}
@@ -464,6 +492,15 @@ export default function MotorQuoteClient({
         </div>
       </div>
     </form>
+  );
+}
+
+function Summary({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-success/70">{label}</dt>
+      <dd className="mt-0.5 text-sm font-medium text-ink">{value}</dd>
+    </div>
   );
 }
 

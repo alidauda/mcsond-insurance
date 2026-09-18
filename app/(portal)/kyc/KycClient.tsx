@@ -3,10 +3,12 @@
 import { useActionState, useState } from "react";
 import { Icon } from "@/components/icons";
 import { PageHeading, Card, SectionLabel, Button, Badge, Divider, cx } from "@/components/ui";
-import type { KycEvidence, KycAttempt } from "@/lib/kyc";
+import type { KycEvidence, KycAttempt, DeclaredIdentity } from "@/lib/kyc";
+import { isDeclarationComplete } from "@/lib/kyc-shared";
 import type { KycMethod } from "@/lib/swiftcheck";
 import type { KycStatus } from "@/lib/mock-data";
-import { verifyIdentity, type KycState } from "./actions";
+import { NIGERIAN_STATES } from "@/lib/nigeria";
+import { verifyIdentity, saveIdentityDetails, type KycState, type DetailsState } from "./actions";
 
 const inputCls =
   "h-11 w-full rounded-[10px] border border-line bg-surface px-3.5 text-sm text-ink outline-none focus:border-navy";
@@ -42,15 +44,21 @@ export default function KycClient({
   evidence,
   attempts,
   methods,
+  declared,
 }: {
   accountName: string;
   status: KycStatus;
   evidence: KycEvidence | null;
   attempts: KycAttempt[];
   methods: KycMethod[];
+  declared: DeclaredIdentity;
 }) {
   const [method, setMethod] = useState<KycMethod>(methods[0] ?? "phone");
   const [state, formAction, pending] = useActionState<KycState, FormData>(verifyIdentity, null);
+  const [detailsState, detailsAction, savingDetails] = useActionState<DetailsState, FormData>(saveIdentityDetails, null);
+  const detailsComplete = isDeclarationComplete(declared);
+  // Show the form when nothing is on file yet, or the customer asked to edit.
+  const [editingDetails, setEditingDetails] = useState(!detailsComplete);
 
   // The action's own result wins over the page's snapshot after a submit.
   const current: KycStatus =
@@ -94,8 +102,78 @@ export default function KycClient({
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
-        {/* ── Verify form ── */}
-        <div className="lg:col-span-2">
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          {/* ── Step 1 · who we're verifying ── */}
+          <Card className="p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionLabel>Step 1 · Your details</SectionLabel>
+              {detailsComplete && current === "unverified" && !editingDetails && (
+                <button type="button" onClick={() => setEditingDetails(true)} className="text-sm font-medium text-navy hover:underline">
+                  Edit
+                </button>
+              )}
+              {current !== "unverified" && <Badge tone="neutral">Locked</Badge>}
+            </div>
+            <p className="mt-2 max-w-xl text-sm text-ink-soft">
+              Tell us who you are first. We compare these with the national record, so a matching name alone can
+              never claim someone else&rsquo;s identity.
+            </p>
+
+            {editingDetails && current === "unverified" ? (
+              <form action={detailsAction} className="mt-5 flex flex-col gap-5">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field2 label="Full name (from your Google account)">
+                    <input value={accountName} readOnly className={cx(inputCls, "bg-surface-soft text-muted")} />
+                    <Hint>Must match your NIN exactly. Change it in your Google account if it doesn&rsquo;t.</Hint>
+                  </Field2>
+                  <Field2 label="Phone number">
+                    <input name="phone" type="tel" maxLength={14} placeholder="08034821190" defaultValue={declared.phone ?? ""} required className={cx(inputCls, "font-mono tnum")} />
+                  </Field2>
+                  <Field2 label="Date of birth">
+                    <input name="dateOfBirth" type="date" defaultValue={declared.dateOfBirth ?? ""} required className={inputCls} />
+                  </Field2>
+                  <Field2 label="Gender">
+                    <select name="gender" defaultValue={declared.gender ?? ""} required className={inputCls}>
+                      <option value="" disabled>Choose…</option>
+                      <option value="f">Female</option>
+                      <option value="m">Male</option>
+                    </select>
+                  </Field2>
+                  <Field2 label="State of origin">
+                    <select name="stateOfOrigin" defaultValue={declared.stateOfOrigin ?? ""} required className={inputCls}>
+                      <option value="" disabled>Choose…</option>
+                      {NIGERIAN_STATES.map((st) => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                  </Field2>
+                </div>
+                {detailsState && (
+                  <p className={cx("text-sm font-medium", detailsState.ok ? "text-success" : "text-crimson")}>{detailsState.message}</p>
+                )}
+                <div className="flex items-center gap-3">
+                  <Button type="submit" variant="primary" icon="check" disabled={savingDetails}>
+                    {savingDetails ? "Saving…" : "Save details"}
+                  </Button>
+                  {detailsComplete && (
+                    <button type="button" onClick={() => setEditingDetails(false)} className="text-sm text-muted hover:underline">
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </form>
+            ) : (
+              <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+                <Field label="Name" value={accountName} />
+                <Field label="Phone" value={declared.phone ?? "—"} mono />
+                <Field label="Date of birth" value={declared.dateOfBirth ?? "—"} />
+                <Field label="Gender" value={declared.gender === "m" ? "Male" : declared.gender === "f" ? "Female" : "—"} />
+                <Field label="State of origin" value={declared.stateOfOrigin ?? "—"} />
+              </dl>
+            )}
+          </Card>
+
+          {/* ── Step 2 · the check ── */}
           {current === "verified" ? (
             <Card className="p-6">
               <SectionLabel>Verified identity</SectionLabel>
@@ -117,8 +195,13 @@ export default function KycClient({
               </Button>
             </Card>
           ) : (
-            <Card className="p-6">
-              <SectionLabel className="mb-4">How would you like to verify?</SectionLabel>
+            <Card className={cx("p-6", !detailsComplete && "opacity-60")}>
+              <SectionLabel className="mb-4">Step 2 · How would you like to verify?</SectionLabel>
+              {!detailsComplete && (
+                <p className="mb-4 rounded-[10px] bg-warning-bg px-4 py-3 text-sm text-warning">
+                  Save your details above first — the check compares them with the national record.
+                </p>
+              )}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 {methods.map((m) => {
@@ -242,10 +325,12 @@ export default function KycClient({
                 )}
 
                 <div className="flex items-center gap-4">
-                  <Button type="submit" variant="primary" icon="shieldCheck" disabled={pending}>
+                  <Button type="submit" variant="primary" icon="shieldCheck" disabled={pending || !detailsComplete}>
                     {pending ? "Checking…" : "Verify my identity"}
                   </Button>
-                  {state?.nameMatchScore !== null && state?.nameMatchScore !== undefined && (
+                  {/* Score only on a positive outcome — on a failure it would tell an
+                      impostor how close their guess was. */}
+                  {state?.outcome !== "failed" && state?.nameMatchScore !== null && state?.nameMatchScore !== undefined && (
                     <span className="text-sm text-muted">Name match {state.nameMatchScore}%</span>
                   )}
                 </div>

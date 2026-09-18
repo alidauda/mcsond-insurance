@@ -4,7 +4,7 @@ import { useActionState, useState, useTransition } from "react";
 import { Card, SectionLabel, Button, Badge, Divider, cx } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import { decideKycReview, runKycForUser } from "@/app/admin/users/actions";
-import type { KycEvidence, KycAttempt, AttemptIdentity } from "@/lib/kyc";
+import type { KycEvidence, KycAttempt, AttemptIdentity, DeclaredIdentity } from "@/lib/kyc";
 import type { KycStatus } from "@/lib/mock-data";
 
 const inputCls =
@@ -28,6 +28,7 @@ export function KycPanel({
   attempts,
   photo,
   canViewPhoto,
+  declared,
 }: {
   userId: string;
   accountName: string;
@@ -37,6 +38,7 @@ export function KycPanel({
   attempts: KycAttempt[];
   photo: string | null;
   canViewPhoto: boolean;
+  declared: DeclaredIdentity;
 }) {
   const [pending, start] = useTransition();
   const [note, setNote] = useState<string | null>(null);
@@ -57,6 +59,12 @@ export function KycPanel({
   const hasRecord = !!record.fullName;
   const mismatch = score !== null && score < AUTO_VERIFY_SCORE;
   const verified = status === "verified";
+  const dobMismatch = evidence?.dobMatch === false;
+  const genderMismatch = evidence?.genderMatch === false;
+  const declaredIncomplete = !declared.dateOfBirth || !declared.gender;
+  const declaredGender = declared.gender === "m" ? "Male" : declared.gender === "f" ? "Female" : null;
+  // Record DOB is DD-MM-YYYY; show the declared one the same way for the eye.
+  const declaredDob = declared.dateOfBirth ? declared.dateOfBirth.split("-").reverse().join("-") : null;
 
   return (
     <Card className="mt-4 p-5">
@@ -96,10 +104,10 @@ export function KycPanel({
               <span className="font-mono text-[0.62rem] uppercase tracking-[0.14em] text-faint">This account</span>
             </div>
             <Compare label="Name" left={record.fullName} right={accountName} highlight={mismatch} />
-            <Compare label="Date of birth" left={record.dateOfBirth} right="—" />
-            <Compare label="Gender" left={record.gender} right="—" />
-            <Compare label="Phone" left={record.phone} right="—" />
-            <Compare label="State of origin" left={record.birthState} right="—" />
+            <Compare label="Date of birth" left={record.dateOfBirth} right={declaredDob} highlight={dobMismatch} />
+            <Compare label="Gender" left={record.gender} right={declaredGender} highlight={genderMismatch} />
+            <Compare label="Phone" left={record.phone} right={declared.phone} highlight={evidence?.phoneMatch === false} />
+            <Compare label="State of origin" left={record.birthState} right={declared.stateOfOrigin} />
             <Compare label="NIN" left={record.ninMasked} right="—" mono />
             <Compare label="Method" left={record.method} right={latest?.at ?? evidence?.verifiedAt ?? "—"} />
           </div>
@@ -123,9 +131,25 @@ export function KycPanel({
             Name match <strong>{score}%</strong>
             {mismatch
               ? ` — below the ${AUTO_VERIFY_SCORE}% automatic threshold, so this needs a human decision.`
-              : " — cleared automatically."}
+              : evidence?.dobMatch && evidence?.genderMatch
+                ? " · date of birth and gender match — cleared automatically."
+                : " — but the declared details didn't all confirm, so this needs a human decision."}
           </span>
         </div>
+      )}
+      {(dobMismatch || genderMismatch) && (
+        <div className="mt-2 flex items-center gap-2.5 rounded-[10px] bg-danger-bg px-4 py-3 text-sm text-crimson">
+          <Icon name="ban" className="size-4 shrink-0" />
+          <span>
+            The customer declared a {dobMismatch && genderMismatch ? "date of birth and gender" : dobMismatch ? "date of birth" : "gender"} that
+            <strong> contradicts the national record</strong>. Treat as a different person unless they can explain it.
+          </span>
+        </div>
+      )}
+      {declaredIncomplete && (
+        <p className="mt-3 text-xs text-warning">
+          This customer hasn&rsquo;t declared their date of birth and gender yet, so a check can&rsquo;t clear automatically — only approve if you have confirmed them another way.
+        </p>
       )}
 
       {/* ── Review decision ── */}

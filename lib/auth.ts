@@ -66,6 +66,12 @@ export const auth = betterAuth({
       company: { type: "string", required: false, input: true },
       // KYC status; only staff (kyc_reviewer+) change it, never the user.
       kyc: { type: "string", required: false, input: false, defaultValue: "unverified" },
+      // Declared identity details — written only by saveIdentityDetails, never
+      // at sign-up, so they can't be set through the auth API.
+      phone: { type: "string", required: false, input: false },
+      dateOfBirth: { type: "string", required: false, input: false },
+      gender: { type: "string", required: false, input: false },
+      stateOfOrigin: { type: "string", required: false, input: false },
     },
   },
   // Google is the only sign-in method. Email/password is deliberately off:

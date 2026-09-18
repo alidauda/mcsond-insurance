@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { getVerifiedPolicyholder } from "@/lib/kyc";
 import { requireCustomer } from "@/lib/server-session";
 import { getKycStatus } from "@/lib/kyc";
 import { getInsurancePlan } from "@/lib/catalog";
@@ -87,11 +88,15 @@ export async function bindMotorPolicyAction(
   const product: NemProductCode = plan.productCode;
 
   // ── policyholder ──
+  // A verified customer's identity comes from the national record, never the
+  // form — the UI doesn't even render those fields, and posting them changes
+  // nothing. Unverified customers type them (and are gated by KycGate anyway).
+  const verified = await getVerifiedPolicyholder(me.id);
   const title = str(formData, "title");
-  const firstName = str(formData, "firstName");
-  const lastName = str(formData, "lastName");
-  const dob = str(formData, "dob");
-  const sexRaw = str(formData, "sex");
+  const firstName = verified?.firstName ?? str(formData, "firstName");
+  const lastName = verified?.lastName ?? str(formData, "lastName");
+  const dob = verified?.dob ?? str(formData, "dob");
+  const sexRaw = verified?.sex ?? str(formData, "sex");
   const phone = str(formData, "phone").replace(/\s+/g, "");
   const address = str(formData, "address");
   const occupation = str(formData, "occupation");

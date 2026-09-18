@@ -9,7 +9,10 @@ import { defaultStatements, adminAc } from "better-auth/plugins/admin/access";
 
 export const statement = {
   ...defaultStatements,
-  user: ["list", "kyc", "ban", "set-role", "impersonate", "delete", "create"],
+  // Keep every action the admin plugin's own endpoints check for (update, get,
+  // set-password, …) — listing only ours here would silently drop them and
+  // 403 the superadmin on adminUpdateUser & co. Then add our custom "kyc".
+  user: [...defaultStatements.user, "kyc"],
   wallet: ["view", "adjust"],
   order: ["view", "refund"],
   product: ["view", "manage"],

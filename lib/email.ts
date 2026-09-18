@@ -180,7 +180,7 @@ export function sendKycOutcomeEmail(opts: { to: string; name: string; outcome: K
     failed: {
       subject: "We couldn't verify your identity",
       heading: `We couldn't verify you, ${hi}.`,
-      body: "The name on the record we found doesn't match the name on your account. Check that your account name matches your ID exactly, then run the check again with your own identity details.",
+      body: "The details on your profile don't match the identity record we found. Check that your name, date of birth and gender are exactly as they appear on your NIN, then run the check again with your own identity details.",
       ctaLabel: "Try again",
       path: "/kyc",
     },
